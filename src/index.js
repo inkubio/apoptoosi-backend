@@ -62,6 +62,7 @@ let transporter = nodemailer.createTransport({
 });
 
 const app = express();
+const clients = {}
 
 app.use(bodyParser.json());
 
@@ -151,7 +152,6 @@ app.get('/participants', (req, res) => {
    });
 });
 
-
 app.get('/all', (req,res) => {
    if(process.env.NODE_ENV === 'development') {
       connection.query('SELECT * FROM participants', (err, rows) => {
@@ -163,6 +163,31 @@ app.get('/all', (req,res) => {
    }
 
 });
+
+app.get('/signup/enable', (req, res) => {
+   const headers = {
+      'Content-Type': 'text/event-stream',
+      'Connection': 'keep-alive',
+      'Cache-Control': 'no-cache'
+   };
+   res.writeHead(200, headers);
+
+   let untilGuests = Date.UTC(2020,1, 5,12,0,0,0) - Date.now();
+   let untilOthers = Date.UTC(2020,1, 19,12,0,0,0) - Date.now();
+   let timeoutIDGuests = setTimeout(() => {
+      res.write(`data: ${JSON.stringify({guest: true})}\n\n`);
+   },untilGuests);
+   let timeoutIDOthers = setTimeout(() => res.write(`data: ${JSON.stringify({others: true})}\n\n`),untilOthers);
+
+   res.on('close', () => {
+      console.log('client dropped me');
+      clearTimeout(timeoutIDGuests);
+      clearTimeout(timeoutIDOthers);
+      res.end();
+   });
+});
+
+
 
 app.listen(process.env.PORT, () => {
    console.log(`App listening on port ${process.env.PORT}!`)
