@@ -46,8 +46,19 @@ connection.query('CREATE TABLE IF NOT EXISTS participants(' +
     'gift BIT(1) DEFAULT 0,' +
     'invited BIT(1) DEFAULT 0,' +
     'alumni BIT(1) DEFAULT 0,' +
+    'timestamp TIMESTAMP DEFAULT NOW(),' +
     'PRIMARY KEY(id)' +
     ') CHARACTER SET utf8;');
+
+let transporter = nodemailer.createTransport({
+   host: process.env.MAIL_SERVER,
+   port: process.env.MAIL_PORT,
+   secure: process.env.SECURE_MAIL === "true" || false,
+   auth: {
+      user: process.env.MAIL_USER,
+      pass: process.env.MAIL_PASSWD
+   }
+});
 
 const app = express();
 
@@ -60,6 +71,7 @@ app.use(function(req, res, next) {
 });
 
 app.post('/signup', (req, res) => {
+   // TODO: Check proper values for all fields
    const data = req.body;
    let dataFormatted = {
       firstname: data.firstName,
@@ -73,15 +85,20 @@ app.post('/signup', (req, res) => {
    console.log(dataFormatted);
    connection.query('INSERT INTO participants SET ?', dataFormatted, (err, result) => {
       if(err) throw err;
-      console.log(result);
       res.json(result);
+   });
+   transporter.sendMail({
+      from: '"No reply" <no-reply@inkubio.fi>', // sender address
+      to: data.email, // list of receivers
+      subject: "Apoptoosi Ilmoittautuminen", // Subject line
+      text: "Hello world?", // plain text body
+      html: "<b>Hello world?</b>" // html body
    });
 });
 
 app.get('/spots', (req,res) => {
    connection.query('SELECT COUNT(*) AS count FROM participants', (err, value) => {
       if (err) throw err;
-      console.log(value);
       res.json({
          maxSpots: 150,
          usedSpots: value[0].count
@@ -92,7 +109,6 @@ app.get('/spots', (req,res) => {
 app.get('/participants', (req, res) => {
    connection.query('SELECT id,firstname,lastname,tableGroup FROM participants', (err, rows) => {
       if (err) throw err;
-
       res.json(rows);
    });
 });
