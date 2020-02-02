@@ -35,14 +35,14 @@ connection.connect((err) => {
 });
 connection.query('CREATE TABLE IF NOT EXISTS participants(' +
     'id TINYINT AUTO_INCREMENT NOT NULL,' +
-    'firstname VARCHAR(20) NOT NULL,' +
-    'lastname VARCHAR(40) NOT NULL,' +
-    'email TEXT NOT NULL,' +
+    'firstname VARCHAR(50) NOT NULL,' +
+    'lastname VARCHAR(50) NOT NULL,' +
+    'email VARCHAR(255) NOT NULL,' +
     'diet TEXT,' +
     'alcohol BIT(1) DEFAULT 0,' +
     'tableGroup TEXT,' +
-    'avec VARCHAR(60),' +
-    'organisation TEXT,' +
+    'avec VARCHAR(100),' +
+    'organisation VARCHAR(255),' +
     'gift BIT(1) DEFAULT 0,' +
     'invited BIT(1) DEFAULT 0,' +
     'alumni BIT(1) DEFAULT 0,' +
@@ -77,15 +77,20 @@ app.post('/signup', (req, res) => {
       firstname: data.firstName,
       lastname: data.lastName,
       email: data.email,
-      diet: data.diet,
       alcohol: 'yes' === data.alcohol,
       tableGroup: data.tableGroup,
-      avec: data.avec
+      diet: data.diet,
+      avec: data.avec,
+      organisation: data.organisation,
+      gift: 'yes' === data.gift,
+      alumni: 'yes' === data.alumni,
+      invited: data.invited
    };
+   console.log(data);
    console.log(dataFormatted);
    connection.query('INSERT INTO participants SET ?', dataFormatted, (err, result) => {
       if(err) throw err;
-      res.json(result);
+      res.status(201).json(dataFormatted);
    });
    transporter.sendMail({
       from: '"No reply" <no-reply@inkubio.fi>', // sender address
@@ -113,11 +118,17 @@ app.get('/participants', (req, res) => {
    });
 });
 
+
 app.get('/all', (req,res) => {
-   connection.query('SELECT * FROM participants', (err, rows) => {
-      if(err) throw err;
-      res.json(rows);
-   });
+   if(process.env.NODE_ENV === 'development') {
+      connection.query('SELECT * FROM participants', (err, rows) => {
+         if(err) throw err;
+         res.json(rows);
+      });
+   } else {
+      res.status(401).send();
+   }
+
 });
 
 app.listen(process.env.PORT, () => {
