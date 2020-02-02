@@ -46,6 +46,7 @@ connection.query('CREATE TABLE IF NOT EXISTS participants(' +
     'gift BIT(1) DEFAULT 0,' +
     'invited BIT(1) DEFAULT 0,' +
     'alumni BIT(1) DEFAULT 0,' +
+    'sillis BIT(1) DEFAULT 0,' +
     'timestamp TIMESTAMP DEFAULT NOW(),' +
     'PRIMARY KEY(id)' +
     ') CHARACTER SET utf8;');
@@ -84,6 +85,7 @@ app.post('/signup', (req, res) => {
       organisation: data.organisation,
       gift: 'yes' === data.gift,
       alumni: 'yes' === data.alumni,
+      sillis: 'yes' === data.sillis,
       invited: data.invited
    };
    console.log(data);
@@ -92,12 +94,43 @@ app.post('/signup', (req, res) => {
       if(err) throw err;
       res.status(201).json(dataFormatted);
    });
+   let text = data.language === 'fi' ?
+       `Turhaa lätinää kaikesta
+       
+Ilmoittauduit seuraavin tiedoin:
+
+Nimi: ${dataFormatted.firstname} ${dataFormatted.lastname}
+Sähköposti: ${dataFormatted.email}
+Erityisruokavaliot: ${dataFormatted.diet}
+Alkoholia: ${dataFormatted.alcohol ? 'Kyllä' : 'Ei'}
+Pöytäryhmä: ${dataFormatted.tableGroup}
+Avec: ${dataFormatted.avec}
+Edustamani taho: ${dataFormatted.organisation}
+Jätän tervehdyksen: ${dataFormatted.gift ? 'Kyllä': 'Ei'}
+Alumni: ${dataFormatted.alumni  ? 'Kyllä' : 'Ei'}
+Sillis: ${dataFormatted.sillis  ? 'Kyllä' : 'Ei'}`
+ :
+ `Some useless chatter
+      
+You have registered with following information:
+
+Name: ${dataFormatted.firstname} ${dataFormatted.lastname}
+Email: ${dataFormatted.email}
+Dietary Restrictions: ${dataFormatted.diet}
+Alcohol: ${dataFormatted.alcohol ? 'Kyllä' : 'Ei'}
+Table Group: ${dataFormatted.tableGroup}
+Avec: ${dataFormatted.avec}
+Represented Organisation: ${dataFormatted.organisation}
+I shall leave a salute: ${dataFormatted.gift ? 'Kyllä': 'Ei'}
+Alumni: ${dataFormatted.alumni  ? 'Kyllä' : 'Ei'}
+Sillis: ${dataFormatted.sillis  ? 'Kyllä' : 'Ei'}`;
+
+
    transporter.sendMail({
-      from: '"No reply" <no-reply@inkubio.fi>', // sender address
-      to: data.email, // list of receivers
-      subject: "Apoptoosi Ilmoittautuminen", // Subject line
-      text: "Hello world?", // plain text body
-      html: "<b>Hello world?</b>" // html body
+      from: '"No reply" <no-reply@inkubio.fi>',
+      to: data.email,
+      subject: "Apoptoosi XVI Ilmoittautuminen",
+      text: text,
    });
 });
 
