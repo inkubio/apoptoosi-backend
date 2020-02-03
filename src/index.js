@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const nodemailer = require("nodemailer");
+const { check, validationResult } = require('express-validator');
 const mysql = require('mysql');
 
 const connection = mysql.createConnection({
@@ -62,18 +63,32 @@ let transporter = nodemailer.createTransport({
 });
 
 const app = express();
-const clients = {}
 
 app.use(bodyParser.json());
 
 app.use(function(req, res, next) {
-   res.header("Access-Control-Allow-Origin", "*"); // update to match the domain you will make the request from
+   res.header("Access-Control-Allow-Origin", "*");
    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
    next();
 });
 
-app.post('/signup', (req, res) => {
-   // TODO: Check proper values for all fields
+app.post('/signup',[
+   check('email').isEmail(),
+   check('firstName').notEmpty().isString(),
+   check('lastName').notEmpty().isString(),
+   check('alcohol').notEmpty().isString(),
+   check('tableGroup').optional({nullable: true}).isString(),
+   check('diet').optional({nullable: true}).isString(),
+   check('avec').optional({nullable: true}).isString(),
+   check('organisation').optional({nullable: true}).isString(),
+   check('alumni').optional({nullable: true}).isString(),
+   check('gift').optional({nullable: true}).isString(),
+   check('sillis').optional({nullable: true}).isString(),
+   check('invited').optional({nullable: true}).isBoolean()], (req, res) => {
+   const errors = validationResult(req);
+   if (!errors.isEmpty()) {
+    return res.status(422).json({ errors: errors.array() });
+   }
    const data = req.body;
    let dataFormatted = {
       firstname: data.firstName,
@@ -89,8 +104,6 @@ app.post('/signup', (req, res) => {
       sillis: 'yes' === data.sillis,
       invited: data.invited
    };
-   console.log(data);
-   console.log(dataFormatted);
    connection.query('INSERT INTO participants SET ?', dataFormatted, (err, result) => {
       if(err) throw err;
       res.status(201).json(dataFormatted);
@@ -176,7 +189,6 @@ app.get('/signup/enable', (req, res) => {
    let untilOthers = new Date(2020,1, 19,12,0,0,0).getTime()- Date.now();
    let timeoutIDGuests = setTimeout(() => {
       res.write(`data: ${JSON.stringify({guest: true})}\n\n`);
-      console.log("TEST");
    },untilGuests);
    let timeoutIDOthers = setTimeout(() => res.write(`data: ${JSON.stringify({others: true})}\n\n`),untilOthers);
 
