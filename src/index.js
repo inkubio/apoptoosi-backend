@@ -44,10 +44,10 @@ connection.query('CREATE TABLE IF NOT EXISTS participants(' +
     'tableGroup TEXT,' +
     'avec VARCHAR(100),' +
     'organisation VARCHAR(255),' +
-    'gift BIT(1) DEFAULT 0,' +
-    'invited BIT(1) DEFAULT 0,' +
-    'alumni BIT(1) DEFAULT 0,' +
-    'sillis BIT(1) DEFAULT 0,' +
+    'gift BIT(1) NOT NULL DEFAULT 0,' +
+    'invited BIT(1) NOT NULL DEFAULT 0,' +
+    'alumni BIT(1) NOT NULL DEFAULT 0,' +
+    'sillis BIT(1) NOT NULL DEFAULT 0,' +
     'timestamp TIMESTAMP DEFAULT NOW(),' +
     'PRIMARY KEY(id)' +
     ') CHARACTER SET utf8;');
@@ -102,10 +102,12 @@ app.post('/signup',[
       gift: 'yes' === data.gift,
       alumni: 'yes' === data.alumni,
       sillis: 'yes' === data.sillis,
-      invited: data.invited
+      invited: data.invited || false,
    };
    connection.query('INSERT INTO participants SET ?', dataFormatted, (err, result) => {
-      if(err) throw err;
+      if(err) {
+         res.status(401).send();
+      }
       res.status(201).json(dataFormatted);
    });
    let text = data.language === 'fi' ?
@@ -185,8 +187,8 @@ app.get('/signup/enable', (req, res) => {
    };
    res.writeHead(200, headers);
 
-   let untilGuests = new Date(2020, 1, 3, 2, 2, 30, 0).getTime() - Date.now();
-   let untilOthers = new Date(2020,1, 19,12,0,0,0).getTime()- Date.now();
+   let untilGuests = Date.parse(process.env.ENABLE_GUEST) - Date.now();
+   let untilOthers = Date.parse(process.env.ENABLE_OTHER) - Date.now();
    let timeoutIDGuests = setTimeout(() => {
       res.write(`data: ${JSON.stringify({guest: true})}\n\n`);
    },untilGuests);
