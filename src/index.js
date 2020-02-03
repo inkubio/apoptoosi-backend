@@ -148,7 +148,7 @@ Sillis: ${dataFormatted.sillis  ? 'Kyllä' : 'Ei'}`;
    transporter.sendMail({
       from: '"No reply" <no-reply@inkubio.fi>',
       to: data.email,
-      subject: "Apoptoosi XVI Ilmoittautuminen",
+      subject: data.language === 'fi' ? "Apoptoosi XVI Ilmoittautuminen" : "Apoptoosi XVI Sign Up",
       text: text,
    });
 });
