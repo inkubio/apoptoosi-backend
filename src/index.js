@@ -114,7 +114,7 @@ app.post('/signup',[
       res.status(201).json(dataFormatted);
    });
    let text = data.language === 'fi' ?
-       `Turhaa lätinää kaikesta
+       `Kiitos ilmoittautumisesta
        
 Ilmoittauduit seuraavin tiedoin:
 
@@ -129,7 +129,7 @@ Jätän tervehdyksen: ${dataFormatted.gift ? 'Kyllä': 'Ei'}
 Alumni: ${dataFormatted.alumni  ? 'Kyllä' : 'Ei'}
 Sillis: ${dataFormatted.sillis  ? 'Kyllä' : 'Ei'}`
  :
- `Some useless chatter
+ `Thank you for signing up
       
 You have registered with following information:
 
