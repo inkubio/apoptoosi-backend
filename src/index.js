@@ -89,6 +89,9 @@ app.post('/signup',[
    if (!errors.isEmpty()) {
     return res.status(422).json({ errors: errors.array() });
    }
+   if(Date.now() < Date.parse(process.env.ENABLE_GUEST)) {
+      return res.status(405).send();
+   }
    const data = req.body;
    let dataFormatted = {
       firstname: data.firstName,
