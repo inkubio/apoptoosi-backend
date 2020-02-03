@@ -172,10 +172,11 @@ app.get('/signup/enable', (req, res) => {
    };
    res.writeHead(200, headers);
 
-   let untilGuests = Date.UTC(2020,1, 5,12,0,0,0) - Date.now();
-   let untilOthers = Date.UTC(2020,1, 19,12,0,0,0) - Date.now();
+   let untilGuests = new Date(2020, 1, 3, 2, 2, 30, 0).getTime() - Date.now();
+   let untilOthers = new Date(2020,1, 19,12,0,0,0).getTime()- Date.now();
    let timeoutIDGuests = setTimeout(() => {
       res.write(`data: ${JSON.stringify({guest: true})}\n\n`);
+      console.log("TEST");
    },untilGuests);
    let timeoutIDOthers = setTimeout(() => res.write(`data: ${JSON.stringify({others: true})}\n\n`),untilOthers);
 
