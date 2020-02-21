@@ -2,41 +2,58 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const nodemailer = require("nodemailer");
-var cors = require('cors');
+const https = require('https');
+const http = require('http');
+const fs  = require('fs');
+const cors = require('cors');
 const { check, validationResult } = require('express-validator');
 const mysql = require('mysql');
 
-const connection = mysql.createConnection({
+const dbConfig = {
    host: process.env.HOST,
    user: process.env.DB_USER,
    password: process.env.DB_PASSWD,
    database: process.env.DB,
    port: process.env.DB_PORT || 3306,
    typeCast: function castField( field, useDefaultTypeCasting ) {
-
       // We only want to cast bit fields that have a single-bit in them. If the field
       // has more than one bit, then we cannot assume it is supposed to be a Boolean.
       if ( field !== null && ( field.type === "BIT" ) && ( field.length === 1 ) ) {
-
          var bytes = field.buffer();
-
          // A Buffer in Node represents a collection of 8-bit unsigned integers.
          // Therefore, our single "bit field" comes back as the bits '0000 0001',
          // which is equivalent to the number 1.
          return( bytes[ 0 ] === 1 );
-
       }
-
       return( useDefaultTypeCasting() );
-
    }
-});
-connection.connect((err) => {
-   if (err) throw err;
-   console.log('Connected!');
-});
+};
+
+let connection;
+function handleDisconnect() {
+   connection = mysql.createConnection(dbConfig);  // Recreate the connection, since the old one cannot be reused.
+   connection.connect( function onConnect(err) {   // The server is either down
+      if (err) {                                  // or restarting (takes a while sometimes).
+         console.log('error when connecting to db:', err);
+         setTimeout(handleDisconnect, 10000);    // We introduce a delay before attempting to reconnect,
+      }                                           // to avoid a hot loop, and to allow our node script to
+      console.log("Connected");
+   });                                             // process asynchronous requests in the meantime.
+                                                   // If you're also serving http, display a 503 error.
+   connection.on('error', function onError(err) {
+      console.log('db error', err);
+      if (err.code == 'PROTOCOL_CONNECTION_LOST') {   // Connection to the MySQL server is usually
+         handleDisconnect();                         // lost due to either server restart, or a
+      } else {                                        // connnection idle timeout (the wait_timeout
+         throw err;                                  // server variable configures this)
+      }
+   });
+}
+
+handleDisconnect();
+
 connection.query('CREATE TABLE IF NOT EXISTS participants(' +
-    'id TINYINT AUTO_INCREMENT NOT NULL,' +
+    'id SMALLINT AUTO_INCREMENT NOT NULL,' +
     'firstname VARCHAR(50) NOT NULL,' +
     'lastname VARCHAR(50) NOT NULL,' +
     'email VARCHAR(255) NOT NULL,' +
@@ -56,22 +73,17 @@ connection.query('CREATE TABLE IF NOT EXISTS participants(' +
 let transporter = nodemailer.createTransport({
    host: process.env.MAIL_SERVER,
    port: process.env.MAIL_PORT,
-   secure: process.env.SECURE_MAIL === "true" || false,
-   auth: {
-      user: process.env.MAIL_USER,
-      pass: process.env.MAIL_PASSWD
+   tls:{
+      rejectUnauthorized: false
    }
 });
 
 const app = express();
 
+app.use(express.static(__dirname + '/static', { dotfiles: 'allow' } ))
+
 app.use(bodyParser.json());
 
-/*app.use(function(req, res, next) {
-   res.header("Access-Control-Allow-Origin", "*");
-   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-   next();
-});*/
 app.use(cors());
 
 app.post('/signup',[
@@ -89,7 +101,9 @@ app.post('/signup',[
    check('invited').optional({nullable: true}).isBoolean()], (req, res) => {
    const errors = validationResult(req);
    if (!errors.isEmpty()) {
-    return res.status(422).json({ errors: errors.array() });
+      console.log("Validation error");
+      console.log(req.body);
+      return res.status(422).json({ errors: errors.array() });
    }
    if(Date.now() < Date.parse(process.env.ENABLE_GUEST)) {
       return res.status(405).send();
@@ -111,7 +125,9 @@ app.post('/signup',[
    };
    connection.query('INSERT INTO participants SET ?', dataFormatted, (err, result) => {
       if(err) {
-         res.status(401).send();
+         console.log("Database insert error");
+         console.log(err);
+         return res.status(401).send();
       }
       res.status(201).json(dataFormatted);
    });
@@ -130,8 +146,8 @@ Edustamani taho: ${dataFormatted.organisation}
 Jätän tervehdyksen: ${dataFormatted.gift ? 'Kyllä': 'Ei'}
 Alumni: ${dataFormatted.alumni  ? 'Kyllä' : 'Ei'}
 Sillis: ${dataFormatted.sillis  ? 'Kyllä' : 'Ei'}`
- :
- `Thank you for signing up
+       :
+       `Thank you for signing up
       
 You have registered with following information:
 
@@ -152,12 +168,16 @@ Sillis: ${dataFormatted.sillis  ? 'Kyllä' : 'Ei'}`;
       to: data.email,
       subject: data.language === 'fi' ? "Apoptoosi XVI Ilmoittautuminen" : "Apoptoosi XVI Sign Up",
       text: text,
+   },(err, info) => {
+      console.log(info);
    });
 });
 
 app.get('/spots', (req,res) => {
    connection.query('SELECT COUNT(*) AS count FROM participants', (err, value) => {
-      if (err) throw err;
+      if (err) {
+         return res.status(500).send();
+      }
       res.json({
          maxSpots: 150,
          usedSpots: value[0].count
@@ -167,7 +187,9 @@ app.get('/spots', (req,res) => {
 
 app.get('/participants', (req, res) => {
    connection.query('SELECT id,firstname,lastname,tableGroup FROM participants', (err, rows) => {
-      if (err) throw err;
+      if (err) {
+         return res.status(500).send();
+      }
       res.json(rows);
    });
 });
@@ -175,8 +197,11 @@ app.get('/participants', (req, res) => {
 app.get('/all', (req,res) => {
    if(process.env.NODE_ENV === 'development') {
       connection.query('SELECT * FROM participants', (err, rows) => {
-         if(err) throw err;
-         res.json(rows);
+         if(err) {
+            return res.status(500).send();
+         } else {
+            return res.json(rows);
+         }
       });
    } else {
       res.status(401).send();
@@ -200,7 +225,6 @@ app.get('/signup/enable', (req, res) => {
    let timeoutIDOthers = setTimeout(() => res.write(`data: ${JSON.stringify({others: true})}\n\n`),untilOthers);
 
    res.on('close', () => {
-      console.log('client dropped me');
       clearTimeout(timeoutIDGuests);
       clearTimeout(timeoutIDOthers);
       res.end();
@@ -209,6 +233,16 @@ app.get('/signup/enable', (req, res) => {
 
 
 
-app.listen(process.env.PORT, () => {
-   console.log(`App listening on port ${process.env.PORT}!`)
-});
+if (process.env.USE_HTTPS === 'True') {
+   https.createServer({
+      key: fs.readFileSync(__dirname + '/privkey.pem'),
+      cert: fs.readFileSync(__dirname + '/fullchain.pem'),
+      ca: fs.readFileSync(__dirname + '/chain.pem')
+   }, app).listen(process.env.PORT, () => {
+      console.log('Listening...')
+   });
+} else {
+   http.createServer(app).listen(process.env.PORT, (app) => {
+      console.log('Listening...')
+   });
+}
