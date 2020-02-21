@@ -105,7 +105,7 @@ app.post('/signup',[
       console.log(req.body);
       return res.status(422).json({ errors: errors.array() });
    }
-   if(Date.now() < Date.parse(process.env.ENABLE_GUEST)) {
+   if(Date.now() < Date.parse(process.env.ENABLE_GUEST) || Date.now() > Date.parse(process.env.DISABLE_SIGN_UP)) {
       return res.status(405).send();
    }
    const data = req.body;
@@ -217,12 +217,16 @@ app.get('/signup/enable', (req, res) => {
    };
    res.writeHead(200, headers);
 
-   let untilGuests = Date.parse(process.env.ENABLE_GUEST) - Date.now();
-   let untilOthers = Date.parse(process.env.ENABLE_OTHER) - Date.now();
-   let timeoutIDGuests = setTimeout(() => {
-      res.write(`data: ${JSON.stringify({guest: true})}\n\n`);
-   },untilGuests);
-   let timeoutIDOthers = setTimeout(() => res.write(`data: ${JSON.stringify({others: true})}\n\n`),untilOthers);
+   let timeoutIDGuests;
+   let timeoutIDOthers;
+   if(Date.now() < Date.parse(process.env.DISABLE_SIGN_UP)) {
+      let untilGuests = Date.parse(process.env.ENABLE_GUEST) - Date.now();
+      let untilOthers = Date.parse(process.env.ENABLE_OTHER) - Date.now();
+      timeoutIDGuests = setTimeout(() => {
+         res.write(`data: ${JSON.stringify({guest: true})}\n\n`);
+      },untilGuests);
+      timeoutIDOthers = setTimeout(() => res.write(`data: ${JSON.stringify({others: true})}\n\n`),untilOthers);
+   }
 
    res.on('close', () => {
       clearTimeout(timeoutIDGuests);
