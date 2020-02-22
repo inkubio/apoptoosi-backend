@@ -8,6 +8,7 @@ const fs  = require('fs');
 const cors = require('cors');
 const { check, validationResult } = require('express-validator');
 const mysql = require('mysql');
+const auth = require('basic-auth');
 
 const dbConfig = {
    host: process.env.HOST,
@@ -195,7 +196,12 @@ app.get('/participants', (req, res) => {
 });
 
 app.get('/all', (req,res) => {
-   if(process.env.NODE_ENV === 'development') {
+   let user = auth(req);
+   if (!user || !(user.name === process.env.DATA_USER && user.pass === process.env.DATA_PASSWD)) {
+      res.statusCode = 401;
+      res.setHeader('WWW-Authenticate', 'Basic realm="participants"');
+      res.end('Access denied');
+   } else {
       connection.query('SELECT * FROM participants', (err, rows) => {
          if(err) {
             return res.status(500).send();
@@ -203,10 +209,7 @@ app.get('/all', (req,res) => {
             return res.json(rows);
          }
       });
-   } else {
-      res.status(401).send();
    }
-
 });
 
 app.get('/signup/enable', (req, res) => {
